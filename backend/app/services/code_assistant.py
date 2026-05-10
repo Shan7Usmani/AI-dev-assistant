@@ -4,7 +4,6 @@ Rule-based engine with optional LLM integration.
 """
 
 import re
-import os
 import logging
 from typing import Optional
 from app.schemas import (
@@ -182,3 +181,4 @@ def suggest_improvements(code: str, language: Optional[str] = None) -> Suggestio
     )
 
     return SuggestionsResponse(suggestions=cards, overall_score=score, next_step=next_step)
+

@@ -76,6 +76,11 @@ if os.path.isdir(FRONTEND_PATH):
 def root():
     return RedirectResponse(url="/app/")
 
+
+@app.get("/ping", tags=["System"])
+def ping():
+    return {"message": "pong"}
+
 # ── Health ──
 @app.get("/health", tags=["System"])
 def health():

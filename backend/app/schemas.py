@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 from pydantic import BaseModel, field_validator
-
+from pydantic import BaseModel
+from typing import List
 
 class CodeRequest(BaseModel):
     code: str
@@ -84,3 +85,16 @@ class HealthResponse(BaseModel):
     version: str
     message: str
     endpoints: list[str] | None = None
+
+class AnalysisProgressPoint(BaseModel):
+    id: int
+    score: float
+    errors_count: int
+    language: str
+    created_at: str
+
+class ProgressDashboardResponse(BaseModel):
+    history: List[AnalysisProgressPoint]
+    average_score: float
+    best_score: float
+    most_improved: float

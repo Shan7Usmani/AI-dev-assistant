@@ -4,12 +4,19 @@ on:
   pull_request:
     types: [opened, edited, synchronize]
 
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/github-script@v7
+      - name: Validate Pull Request
+        uses: actions/github-script@v7
+
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -23,63 +30,92 @@ jobs:
             // =========================================
             // 1. PR title validation
             // =========================================
+
             const validTitle =
               /^(feat|fix|docs|test|refactor|chore|ci|style|perf)(\(.+\))?: .+/i.test(title);
 
             if (!validTitle) {
               errors.push(
-                '❌ **Invalid PR title format**\\nUse formats like:\\n- `feat: add dark mode toggle`\\n- `fix(backend): resolve API timeout`'
+                '❌ **Invalid PR title format**\nUse formats like:\n- `feat: add dark mode toggle`\n- `fix(backend): resolve API timeout`'
               );
             }
 
             // =========================================
             // 2. Linked issue validation
             // =========================================
+
             const hasLinkedIssue =
               /(fixes|closes|resolves)\s+#\d+/i.test(body);
 
             if (!hasLinkedIssue) {
               errors.push(
-                '❌ **No linked issue found**\\nAdd `Fixes #issue-number` in the PR description.'
+                '❌ **No linked issue found**\nAdd `Fixes #issue-number` in the PR description.'
               );
             }
 
             // =========================================
-            // 3. Description length
+            // 3. Description length validation
             // =========================================
+
             if (body.trim().length < 50) {
               errors.push(
-                '❌ **PR description is too short**\\nPlease explain your changes properly.'
+                '❌ **PR description is too short**\nPlease explain your changes properly.'
               );
             }
 
             // =========================================
             // 4. Checklist validation
             // =========================================
+
             const uncheckedItems =
               (body.match(/- \[ \]/g) || []).length;
 
             if (uncheckedItems > 0) {
               errors.push(
-                `❌ **${uncheckedItems} checklist item(s) are still unchecked**`
+                `❌ **${uncheckedItems} checklist item(s) still unchecked**`
               );
             }
 
             // =========================================
-            // Validation result
+            // Remove old bot comments
             // =========================================
+
+            const comments = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber
+            });
+
+            for (const comment of comments.data) {
+              if (
+                comment.user.login === 'github-actions[bot]' &&
+                (
+                  comment.body.includes('PR Validation Failed') ||
+                  comment.body.includes('PR Validation Passed')
+                )
+              ) {
+                await github.rest.issues.deleteComment({
+                  ...context.repo,
+                  comment_id: comment.id
+                });
+              }
+            }
+
+            // =========================================
+            // Validation failed
+            // =========================================
+
             if (errors.length > 0) {
 
-              // Add label
               try {
                 await github.rest.issues.addLabels({
                   ...context.repo,
                   issue_number: prNumber,
                   labels: ['needs review']
                 });
-              } catch (e) {}
+              } catch (e) {
+                console.log('Label already exists');
+              }
 
-              // Comment
               await github.rest.issues.createComment({
                 ...context.repo,
                 issue_number: prNumber,
@@ -94,24 +130,41 @@ ${errors.join('\n\n')}
 
 Please update your PR and push the changes.
 
-Read:
-- CONTRIBUTING.md
-- PR template checklist
-`
+### Checklist
+- Follow PR title format
+- Link the related issue
+- Complete the PR description
+- Finish all checklist items
+
+Thank you 🚀`
               });
 
               core.setFailed('PR validation failed.');
 
             } else {
 
-              // Remove needs review label if validation passes
               try {
                 await github.rest.issues.removeLabel({
                   ...context.repo,
                   issue_number: prNumber,
                   name: 'needs review'
                 });
-              } catch (e) {}
+              } catch (e) {
+                console.log('Label does not exist');
+              }
+
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: prNumber,
+                body:
+`## PR Validation Passed ✅
+
+Hi @${sender},
+
+Your PR passed all validation checks and is ready for maintainer review 🚀
+
+Thank you for contributing to QyverixAI.`
+              });
 
               console.log('PR validation passed.');
             }

@@ -24,7 +24,7 @@ jobs:
             echo "✓ No files added or modified in this PR"
             exit 0
           fi
-          FAILED=""
+          FAILED=0
           while IFS= read -r f; do
             if [ -f "$f" ]; then
               SIZE=$(stat --format=%s "$f")
@@ -34,7 +34,7 @@ jobs:
               fi
             fi
           done <<< "$CHANGED"
-          if [ -n "$FAILED" ]; then
+          if [ "$FAILED" -eq 1 ]; then
             echo ""
             echo "Large files bloat repo size and slow CI."
             echo "Remove them or use Git LFS / external storage."
